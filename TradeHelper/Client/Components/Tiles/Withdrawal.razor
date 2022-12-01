@@ -1,0 +1,19 @@
+﻿@using TradeHelper.Client.Services
+@inject WalletDataService _dataService
+
+<TelerikNumericTextBox Decimals="2" T="float" Format="C" Step="0.1f" @bind-Value=@Amount></TelerikNumericTextBox>
+<TelerikButton OnClick="@Withdraw">Withdrawal</TelerikButton>
+
+@code{
+    float Amount { get; set; } = 0.0f;
+
+    protected async Task Withdraw()
+    {
+        var totalUsdt = await _dataService.Withdraw(Amount);
+        if (totalUsdt >= 0)
+        {
+            Amount = 0;
+            StateHasChanged();
+        }
+    }
+}

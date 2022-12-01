@@ -1,0 +1,11 @@
+﻿@using TradeHelper.Client.Services
+@inject WalletDataService _dataService
+
+<h2>@FrUsdt.ToString("C0")</h2>
+
+@code{
+    [Parameter]
+    public float FrUsdt { get; set; }
+
+
+}

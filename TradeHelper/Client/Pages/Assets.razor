@@ -1,0 +1,461 @@
+﻿@page "/Assets"
+
+@using TradeHelper.Shared.Models
+@using TradeHelper.Client.Services
+@using TradeHelper.Client.Components.Tiles
+
+@using Telerik.DataSource;
+
+@inject WalletDataService _wdataService
+@inject IJSRuntime _JS
+
+<style>
+    .ellipsis-overflow {
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+</style>
+
+<TelerikGrid Data="@WAssets" Pageable="false" Sortable="true" Groupable="false"
+             FilterMode="Telerik.Blazor.GridFilterMode.FilterMenu" @ref="@MainGrid"
+             EditMode="GridEditMode.Inline" Resizable="true" Reorderable="true" SortMode="SortMode.Multiple"
+             OnUpdate="@UpdateHandler" OnEdit="@EditHandler" OnDelete="@DeleteHandler"
+             OnCreate="@CreateHandler" OnCancel="@CancelHandler">
+    <GridToolBar>
+        <GridCommandButton Command="Add" Icon="add">Add</GridCommandButton>
+        |
+        <GridCommandButton Command="Recently" OnClick="@OnRecently">Recently Modified</GridCommandButton>
+        <GridCommandButton Command="MostAvailable" OnClick="@OnMostAvailable">Most Available</GridCommandButton>
+        <GridCommandButton Command="MostProfit" OnClick="@OnMostProfit">Most Profit</GridCommandButton>
+        <GridCommandButton Command="TopCurrentPnl" OnClick="@OnTopPnl">Top Current Pnl</GridCommandButton>
+        <GridCommandButton Command="ClearGrid" OnClick="@OnClearGrid">Clear Filters</GridCommandButton>
+        |
+        <GridCommandButton Title="Assets to USD" Icon="dollar" Command="AssetsPrice" >@Wallet?.AssetsUsdt</GridCommandButton>
+        |
+        <GridCommandButton Title="BTC/USDT" Icon="graph" Command="BTCPrice" OnClick="@OnBtcChart">$@BTCPrice</GridCommandButton>
+        <span class="k-toolbar-spacer"></span>
+        <GridSearchBox DebounceDelay="200"></GridSearchBox>
+    </GridToolBar>
+    <GridColumns>
+        <GridColumn Field="@(nameof(Asset.Name))" Title="@(nameof(Asset.Title))">
+            <Template>
+                @{
+                    var asset = context as Asset;
+                    <span title="@asset.Title">
+                        @asset.Name
+                    </span>
+                }
+            </Template>
+        </GridColumn>
+        @*<GridColumn Field="@(nameof(Asset.Category))" Groupable="true" OnCellRender="@(e => e.Class ="ellipsis-overflow")">
+                <EditorTemplate>
+                    @{
+                        var asset = context as Asset;
+                        <TelerikDropDownList Data="@RawCollections.AssetCategories" Width="100px" @bind-Value="@asset.Category">
+                        </TelerikDropDownList>
+                    }
+                </EditorTemplate>
+            </GridColumn>*@
+        <GridColumn Field="@(nameof(Asset.BuysQty))" Editable="false" Groupable="false" />
+        <GridColumn Field="@(nameof(Asset.BuyAvg))" DisplayFormat="${0:0.##########}" Editable="false" />
+        <GridColumn Field="@(nameof(Asset.Invested))" DisplayFormat="${0:0.##########}" Editable="false" />
+        <GridColumn Field="@(nameof(Asset.SellsQty))" Editable="false" />
+        <GridColumn Field="@(nameof(Asset.SellAvg))" DisplayFormat="${0:0.##########}" Editable="false" />
+        <GridColumn Field="@(nameof(Asset.Sold))" DisplayFormat="${0:0.##########}" Editable="false" />
+        <GridColumn Field="@(nameof(Asset.Profit))" DisplayFormat="${0:0.##########}" Editable="false" />
+        <GridColumn Field="@(nameof(Asset.X))" DisplayFormat="{0:0.##} X" Editable="false" />
+        <GridColumn Field="@(nameof(Asset.AvailableQty))" Editable="false" />
+        <GridColumn Field="@(nameof(Asset.CurrentPrice))" DisplayFormat="${0:0.##########}" Editable="false" />
+        <GridColumn Field="@(nameof(Asset.CurrentProfit))" DisplayFormat="${0:0.##########}" Editable="false" />
+        <GridColumn Field="@(nameof(Asset.CurrentX))" DisplayFormat="{0:0.##} X" Editable="false" />
+        <GridCommandColumn Width="180px">
+            <GridCommandButton Command="Edit" Icon="edit"></GridCommandButton>
+            <GridCommandButton Command="Save" Icon="save" ShowInEdit="true"></GridCommandButton>
+            <GridCommandButton Command="Cancel" Icon="cancel" ShowInEdit="true"></GridCommandButton>
+            <GridCommandButton Command="Delete" Icon="delete" ShowInEdit="false"></GridCommandButton>
+            <GridCommandButton Command="ChartCommand" Icon="graph" ShowInEdit="false" OnClick="OnChartClick"></GridCommandButton>
+        </GridCommandColumn>
+    </GridColumns>
+
+    <DetailTemplate Context="detailContext">
+        @{
+            var asset = detailContext as Asset;
+            if (asset != null)
+            {
+                <TelerikStackLayout Orientation="StackLayoutOrientation.Horizontal" Spacing="15px">
+                    <TelerikCard Class="k-flex-50">
+                        <CardHeader Class="k-hbox">
+                            <CardTitle>@asset.Name Buy Orders</CardTitle>
+                        </CardHeader>
+                        <CardBody>
+                            <TelerikGrid Data="asset.AssetBuys" Sortable="true"
+                                         FilterMode="Telerik.Blazor.GridFilterMode.None"
+                                         EditMode="GridEditMode.Incell" OnUpdate="@UpdateBuyHandler"
+                                         OnEdit="@(args => EditBuyHandler(asset, args))" OnDelete="@DeleteBuyHandler"
+                                         OnCreate="@(args => CreateBuyHandler(asset, args))" OnCancel="@CancelBuyHandler">
+                                <GridToolBar>
+                                    <GridCommandButton Command="Add" Icon="add">Add</GridCommandButton>
+                                </GridToolBar>
+                                <GridColumns>
+                                    <GridColumn Field="@(nameof(AssetBuy.Quantity))">
+                                        <EditorTemplate>
+                                            @{
+                                                    var aBuy = context as AssetBuy;
+                                                <TelerikNumericTextBox Decimals="6" @bind-Value="@aBuy.Quantity"></TelerikNumericTextBox>
+                                            }
+                                        </EditorTemplate>
+                                    </GridColumn>
+                                    <GridColumn Field="@(nameof(AssetBuy.Price))">
+                                        <EditorTemplate>
+                                            @{
+                                                    var aBuy = context as AssetBuy;
+                                                <TelerikNumericTextBox Decimals="10" @bind-Value="@aBuy.Price"></TelerikNumericTextBox>
+                                            }
+                                        </EditorTemplate>
+                                    </GridColumn>
+                                    @*<GridColumn Field="@(nameof(AssetBuy.Date))" DisplayFormat="{0:dd MMM yy}"></GridColumn>*@
+                                    <GridColumn Field="@(nameof(AssetBuy.Bought))"></GridColumn>
+                                    @*<GridColumn Field="@(nameof(AssetBuy.Exchange))">
+                                            <EditorTemplate>
+                                                @{
+                                                        var aBuy = context as AssetBuy;
+                                                    <TelerikDropDownList Data="@RawCollections.Exchange" Width="100px" @bind-Value="@aBuy.Exchange">
+                                                    </TelerikDropDownList>
+                                                }
+                                            </EditorTemplate>
+                                        </GridColumn>*@
+                                    <GridColumn Field="@(nameof(AssetBuy.Comment))"></GridColumn>
+                                    <GridCommandColumn Width="180px">
+                                        <GridCommandButton Command="Delete" Icon="delete" ShowInEdit="false"></GridCommandButton>
+                                    </GridCommandColumn>
+                                </GridColumns>
+                            </TelerikGrid>
+                        </CardBody>
+                    </TelerikCard>
+                    <TelerikCard Class="k-flex-50">
+                        <CardHeader Class="k-hbox">
+                            <CardTitle>@asset.Name Sell Orders</CardTitle>
+                        </CardHeader>
+                        <CardBody>
+                            <TelerikGrid Data="asset.AssetSells" Sortable="true"
+                                         FilterMode="Telerik.Blazor.GridFilterMode.None"
+                                         EditMode="GridEditMode.Incell" OnUpdate="@UpdateSellHandler"
+                                         OnEdit="@(args => EditSellHandler(asset, args))" OnDelete="@DeleteSellHandler"
+                                         OnCreate="@(args => CreateSellHandler(asset, args))" OnCancel="@CancelSellHandler">
+                                <GridToolBar>
+                                    <GridCommandButton Command="Add" Icon="add">Add</GridCommandButton>
+                                </GridToolBar>
+                                <GridColumns>
+                                    <GridColumn Field="@(nameof(AssetSell.Quantity))">
+                                        <EditorTemplate>
+                                            @{
+                                                    var aSell = context as AssetSell;
+                                                <TelerikNumericTextBox Decimals="6" @bind-Value="@aSell.Quantity"></TelerikNumericTextBox>
+                                            }
+                                        </EditorTemplate>
+                                    </GridColumn>
+                                    <GridColumn Field="@(nameof(AssetSell.Price))">
+                                        <EditorTemplate>
+                                            @{
+                                                    var aSell = context as AssetSell;
+                                                <TelerikNumericTextBox Decimals="10" @bind-Value="@aSell.Price"></TelerikNumericTextBox>
+                                            }
+                                        </EditorTemplate>
+                                    </GridColumn>
+                                    @*<GridColumn Field="@(nameof(AssetSell.Date))" DisplayFormat="{0:dd MMM yy}"></GridColumn>*@
+                                    <GridColumn Field="@(nameof(AssetSell.Sold))"></GridColumn>
+                                    @*<GridColumn Field="@(nameof(AssetSell.Exchange))">
+                                            <EditorTemplate>
+                                                @{
+                                                    var aSell = context as AssetSell;
+                                                    <TelerikDropDownList Data="@RawCollections.Exchange" Width="100px" @bind-Value="@aSell.Exchange">
+                                                    </TelerikDropDownList>
+                                                }
+                                            </EditorTemplate>
+                                        </GridColumn>*@
+                                    <GridColumn Field="@(nameof(AssetSell.Comment))"></GridColumn>
+                                    <GridCommandColumn Width="180px">
+                                        <GridCommandButton Command="Delete" Icon="delete" ShowInEdit="false"></GridCommandButton>
+                                    </GridCommandColumn>
+                                </GridColumns>
+                            </TelerikGrid>
+                        </CardBody>
+                    </TelerikCard>
+                </TelerikStackLayout>
+            }
+        }
+    </DetailTemplate>
+</TelerikGrid>
+
+<TelerikWindow Class="demo-window" Width="1450px" Height="900px" Centered="true" @bind-Visible=@ChartWindow Modal="true">
+    <WindowTitle>
+        <strong>Chart Window</strong>
+    </WindowTitle>
+    <WindowActions>
+        <WindowAction Name="Close" />
+    </WindowActions>
+    <WindowContent>
+        <iframe width="1400" height="820" src="chart.html?value=@ChartName"></iframe>
+    </WindowContent>
+</TelerikWindow>
+
+@code {
+
+    string SelectedCoin { get; set; }
+    bool ChartWindow { get; set; }
+    string ChartName { get; set; }
+    TelerikGrid<Asset> MainGrid { get; set; }
+    float BTCPrice => WAssets?.FirstOrDefault(x => x.Name.Equals("BTC", StringComparison.OrdinalIgnoreCase))?.CurrentPrice ?? 0.0f;
+
+    Wallet Wallet { get; set; }
+    List<Asset> WAssets => Wallet?.Assets;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshWallet();
+    }
+
+    private async Task RefreshWallet()
+    {
+        Wallet = await _wdataService.GetWallet();
+    }
+
+    void EditHandler(GridCommandEventArgs args)
+    {
+        var item = (Asset)args.Item;
+
+        // prevent opening for edit based on condition
+        //if (item.ID < 3)
+        //{
+        //    args.IsCancelled = true;// the general approach for cancelling an event
+        //}
+
+        Console.WriteLine("Edit event is fired.");
+    }
+
+    async Task UpdateHandler(GridCommandEventArgs args)
+    {
+        var asset = (Asset)args.Item;
+
+        if (await _wdataService.UpdateAsset(asset))
+        {
+            await RefreshWallet();
+        }
+    }
+
+    async Task DeleteHandler(GridCommandEventArgs args)
+    {
+    }
+
+    async Task CreateHandler(GridCommandEventArgs args)
+    {
+        var asset = (Asset)args.Item;
+        if (await _wdataService.CreateAsset(asset))
+        {
+            await RefreshWallet();
+        }
+    }
+
+    async Task CancelHandler(GridCommandEventArgs args)
+    {
+    }
+
+
+    void EditBuyHandler(Asset asset, GridCommandEventArgs args)
+    {
+        var item = (AssetBuy)args.Item;
+
+        // prevent opening for edit based on condition
+        //if (item.ID < 3)
+        //{
+        //    args.IsCancelled = true;// the general approach for cancelling an event
+        //}
+
+        Console.WriteLine("Edit event is fired.");
+    }
+
+    async Task UpdateBuyHandler(GridCommandEventArgs args)
+    {
+        var assetbuy = (AssetBuy)args.Item;
+
+        if (await _wdataService.UpdateAssetBuy(assetbuy))
+        {
+            await RefreshWallet();
+        }
+    }
+
+    async Task DeleteBuyHandler(GridCommandEventArgs args)
+    {
+        var assetBuy = (AssetBuy)args.Item;
+        if (await _wdataService.DelAssetBuy(assetBuy))
+        {
+            await RefreshWallet();
+        }
+    }
+
+    async Task CreateBuyHandler(Asset asset, GridCommandEventArgs args)
+    {
+        var assetBuy = (AssetBuy)args.Item;
+        //assetBuy.Asset = asset;
+        assetBuy.AssetId = asset.Id;
+
+        if (await _wdataService.CreateBuyAsset(assetBuy))
+        {
+            await RefreshWallet();
+        }
+    }
+
+    async Task CancelBuyHandler(GridCommandEventArgs args)
+    {
+
+    }
+
+    void EditSellHandler(Asset asset, GridCommandEventArgs args)
+    {
+        var item = (AssetSell)args.Item;
+
+        // prevent opening for edit based on condition
+        //if (item.ID < 3)
+        //{
+        //    args.IsCancelled = true;// the general approach for cancelling an event
+        //}
+
+        Console.WriteLine("Edit event is fired.");
+    }
+
+    async Task UpdateSellHandler(GridCommandEventArgs args)
+    {
+        var assetsell = (AssetSell)args.Item;
+
+        if (await _wdataService.UpdateAssetSell(assetsell))
+        {
+            await RefreshWallet();
+        }
+    }
+
+    async Task DeleteSellHandler(GridCommandEventArgs args)
+    {
+        var assetsell = (AssetSell)args.Item;
+        if (await _wdataService.DelAssetSell(assetsell))
+        {
+            await RefreshWallet();
+        }
+    }
+
+    async Task CreateSellHandler(Asset asset, GridCommandEventArgs args)
+    {
+        var assetsell = (AssetSell)args.Item;
+        assetsell.AssetId = asset.Id;
+
+        if (await _wdataService.CreateSellAsset(assetsell))
+        {
+            await RefreshWallet();
+        }
+    }
+
+    async Task CancelSellHandler(GridCommandEventArgs args)
+    {
+
+    }
+
+    async Task OnChartClick(GridCommandEventArgs args)
+    {
+        var asset = (Asset)args.Item;
+
+        ChartWindow = true;
+        ChartName = asset.Name.ToUpper() + "USDT";
+
+        //var asset = (Asset)args.Item;
+        //var tradingview = await _JS.InvokeAsync<object>("showTradingView", asset.Name.ToUpper()+"USD");
+    }
+
+    async Task OnBtcChart(GridCommandEventArgs args)
+    {
+        var asset = (Asset)args.Item;
+
+        ChartWindow = true;
+        ChartName = "BTCUSDT";
+
+        //var asset = (Asset)args.Item;
+        //var tradingview = await _JS.InvokeAsync<object>("showTradingView", asset.Name.ToUpper()+"USD");
+    }
+
+    async Task OnRecently(GridCommandEventArgs args)
+    {
+        GridState<Asset> desiredState = new GridState<Asset>()
+        {
+            SortDescriptors = new List<SortDescriptor>()
+{
+                new SortDescriptor { Member = "LastModified", SortDirection = ListSortDirection.Descending}
+            }
+        };
+
+        await MainGrid.SetState(desiredState);
+    }
+
+    async Task OnMostAvailable(GridCommandEventArgs args)
+    {
+        GridState<Asset> desiredState = new GridState<Asset>()
+        {
+            SortDescriptors = new List<SortDescriptor>()
+{
+                new SortDescriptor { Member = "Invested", SortDirection = ListSortDirection.Descending},
+                new SortDescriptor { Member = "AvailableQty", SortDirection = ListSortDirection.Descending}
+            }
+        };
+
+        await MainGrid.SetState(desiredState);
+    }
+
+    async Task OnMostProfit(GridCommandEventArgs args)
+    {
+        GridState<Asset> desiredState = new GridState<Asset>()
+        {
+            SortDescriptors = new List<SortDescriptor>()
+{
+                new SortDescriptor { Member = "CurrentProfit", SortDirection = ListSortDirection.Descending}
+            },
+            FilterDescriptors = new List<FilterDescriptorBase>()
+{
+            new CompositeFilterDescriptor()
+            {
+                FilterDescriptors = new FilterDescriptorCollection()
+    {
+                    new FilterDescriptor() { Member = "AvailableQty", Operator = FilterOperator.IsGreaterThan, Value = 0, MemberType = typeof(float) },
+                }
+            }
+        }
+        };
+
+        await MainGrid.SetState(desiredState);
+    }
+
+    async Task OnTopPnl(GridCommandEventArgs args)
+    {
+        GridState<Asset> desiredState = new GridState<Asset>()
+        {
+            FilterDescriptors = new List<FilterDescriptorBase>()
+{
+            new CompositeFilterDescriptor()
+            {
+                FilterDescriptors = new FilterDescriptorCollection()
+    {
+                    new FilterDescriptor() { Member = "AvailableQty", Operator = FilterOperator.IsGreaterThan, Value = 0, MemberType = typeof(float) },
+                }
+            }
+        },
+            SortDescriptors = new List<SortDescriptor>()
+{
+                new SortDescriptor { Member = "CurrentX", SortDirection = ListSortDirection.Descending}
+            }
+        };
+
+        await MainGrid.SetState(desiredState);
+
+    }
+
+    async Task OnClearGrid(GridCommandEventArgs args)
+    {
+        await MainGrid.SetState(new GridState<Asset>());
+    }
+}

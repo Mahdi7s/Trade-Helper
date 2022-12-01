@@ -1,0 +1,45 @@
+﻿<html>
+<head>
+    <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+    <script>
+    function getParameterByName(name, url) {
+    if (!url) {
+      url = window.location.href;
+    }
+    name = name.replace(/[\[\]]/g, "\\$&");
+    var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)"),
+        results = regex.exec(url);
+    if (!results) return null;
+    if (!results[2]) return '';
+    return decodeURIComponent(results[2].replace(/\+/g, " "));
+}
+var fx = getParameterByName('value');
+      var fxWidget = new TradingView.widget({
+      "width": 1350,
+      "height": 800,
+      "symbol": fx,
+      "interval": "1H",
+      "timezone": "Etc/UTC",
+      "theme": "White",
+      "style": "1",
+      "locale": "en",
+          "toolbar_bg": "#f1f3f6",
+          "range": "YTD",
+          "hide_top_toolbar": false,
+      "save_image": false,
+          "hideideas": true,
+          "hide_side_toolbar": false,
+        "allow_symbol_change": true,
+          "details": true,
+          "studies": [
+              "BB@tv-basicstudies",
+              "RSI@tv-basicstudies"
+          ],
+      });
+
+
+    </script>
+</head>
+<body>
+</body>
+</html>

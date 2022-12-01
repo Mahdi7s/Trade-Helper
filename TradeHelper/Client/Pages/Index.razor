@@ -1,0 +1,89 @@
+﻿@page "/"
+
+@using TradeHelper.Shared.Models
+@using TradeHelper.Client.Services
+@using TradeHelper.Client.Components.Tiles
+
+@inject DashboardDataService _dataService
+@inject WalletDataService _wdataService
+
+<div class="d-flex justify-content-center">
+    <TelerikTileLayout Columns="4"
+                       RowHeight="145px"
+                       ColumnWidth="350px"
+                       Reorderable="true"
+                       Resizable="true"
+                       OnResize="@ResizeCharts">
+        <TileLayoutItems>
+            <TileLayoutItem HeaderText="Total USDT">
+                <Content>
+                    <TotalUsdt TotUsdt="@(Wallet?.TotalUSDT ?? 0)" />
+                </Content>
+            </TileLayoutItem>
+            <TileLayoutItem HeaderText="Free USDT">
+                <Content>
+                    <FreeUsdt FrUsdt="@(Wallet?.USDTForTrade ?? 0)"/>
+                </Content>
+            </TileLayoutItem>
+            <TileLayoutItem HeaderText="Deposit">
+                <Content>
+                    <Deposit />
+                </Content>
+            </TileLayoutItem>
+            <TileLayoutItem HeaderText="Withdrawal">
+                <Content>
+                    <Withdrawal />
+                </Content>
+            </TileLayoutItem>
+            <TileLayoutItem HeaderText="Categories" ColSpan="2" RowSpan="2">
+                <Content>
+                    <PlatformsChart @ref="@AppBreakdown" />
+                </Content>
+            </TileLayoutItem>
+            <TileLayoutItem HeaderText="Assets" ColSpan="2" RowSpan="2">
+                <Content>
+                    <PlatformsChart ByDevice="true" @ref="@DeviceBreakdown" />
+                </Content>
+            </TileLayoutItem>
+            <TileLayoutItem HeaderText="Weekly Recap-Downloads" ColSpan="2" RowSpan="2">
+                <Content>
+                    <WeeklyRecap Podcasts="@Podcasts" @ref="@WeeklyRecap" />
+                </Content>
+            </TileLayoutItem>
+            <TileLayoutItem HeaderText="Performance Trend" ColSpan="2" RowSpan="2">
+                <Content>
+                    <PerformanceTrend Podcasts="@Podcasts" @ref="@PerformanceTrend" />
+                </Content>
+            </TileLayoutItem>
+            <TileLayoutItem HeaderText="Top 5 Episodes" ColSpan="4" RowSpan="2">
+                <Content>
+                    <TopEpisodes TopN="5" Podcasts="@Podcasts" />
+                </Content>
+            </TileLayoutItem>
+        </TileLayoutItems>
+    </TelerikTileLayout>
+</div>
+
+@code{
+    Wallet Wallet { get; set; }
+    IEnumerable<PodcastViewModel> Podcasts { get; set; }
+    WeeklyRecap WeeklyRecap { get; set; }
+    PerformanceTrend PerformanceTrend { get; set; }
+    PlatformsChart DeviceBreakdown { get; set; }
+    PlatformsChart AppBreakdown { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Wallet = await _wdataService.GetWallet();
+
+        Podcasts = await _dataService.GetPodcasts();
+    }
+
+    void ResizeCharts()
+    {
+        WeeklyRecap.Resize();
+        PerformanceTrend.Resize();
+        DeviceBreakdown.Resize();
+        AppBreakdown.Resize();
+    }
+}

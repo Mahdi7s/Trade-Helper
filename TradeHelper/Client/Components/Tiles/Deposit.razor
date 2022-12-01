@@ -1,0 +1,19 @@
+﻿@using TradeHelper.Client.Services
+@inject WalletDataService _dataService
+
+<TelerikNumericTextBox Decimals="2" T="float" Format="C" Step="0.1f" @bind-Value=@DepAmount></TelerikNumericTextBox>
+<TelerikButton OnClick="@Depo">Deposit</TelerikButton>
+
+@code{
+    float DepAmount { get; set; } = 0.0f;
+
+    protected async Task Depo()
+    {
+        var totalUsdt = await _dataService.Deposit(DepAmount);
+        if (totalUsdt > 0)
+        {
+            DepAmount = 0;
+            StateHasChanged();
+        }
+    }
+}
